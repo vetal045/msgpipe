@@ -20,39 +20,39 @@ This project implements a high-performance multithreaded message routing system 
 
 ## Optimization Techniques
 
-### ✅ Lock-Free Message Queue
+### Lock-Free Message Queue
 Implemented a circular array queue with atomic head/tail pointers. No locks are used for push/pop, ensuring real-time performance.
 
-### ✅ Custom Deduplication Store
+### Custom Deduplication Store
 Replaced STL sets/maps with a fixed-size hash-bucket container. Optimized for rapid lookups and minimal memory allocation.
 
-### ✅ Non-Blocking UDP and TCP Sockets
+### Non-Blocking UDP and TCP Sockets
 All sockets are initialized in **non-blocking** mode. Platform-specific polling is used:
 - **Linux**: `epoll_wait`
 - **macOS / Windows**: `poll` (fallback)
 
 This avoids blocking calls and improves thread responsiveness.
 
-### ✅ Memory Layout Optimization
+### Memory Layout Optimization
 Message structures are laid out using raw POD types (`<cstdint>`) to ensure predictable size and alignment. No virtuals or heap allocations used.
 
-### ✅ No STL
+### No STL
 All core logic — containers, deduplication, queues — is written from scratch using raw pointers and atomics.
 
-### ✅ Static Preallocation
+### Static Preallocation
 Hash buckets and queues are pre-sized at startup, preventing any runtime dynamic allocations or resizing.
 
-### ✅ Parallel Input Streams
+### Parallel Input Streams
 Two UDP threads independently listen on different ports, allowing horizontal scaling and maximizing throughput.
 
-### ✅ Efficient Polling and Sleep Backoff
+### Efficient Polling and Sleep Backoff
 Polling (epoll/poll) is used with short timeout and thread yields to avoid high CPU usage, while keeping latency low.
 
 ---
 
 ## Building the Project
 
-### ⚙️ Dependencies
+### Dependencies
 
 #### Required (All platforms):
 - **CMake ≥ 3.16**
@@ -62,7 +62,7 @@ Polling (epoll/poll) is used with short timeout and thread yields to avoid high 
 
 ---
 
-### 🐧 Linux
+### Linux
 
 ```bash
 sudo apt update
@@ -76,7 +76,7 @@ cmake --build build
 
 ---
 
-### 🍏 macOS
+### macOS
 
 ```bash
 brew install cmake ninja
@@ -89,7 +89,7 @@ cmake --build build
 
 ---
 
-### 🪟 Windows (MinGW-w64 + Ninja)
+### Windows (MinGW-w64 + Ninja)
 
 1. Install via Chocolatey:
 ```bash
@@ -103,7 +103,7 @@ git clone https://github.com/yourname/msgpipe.git
 cd msgpipe
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
 cmake --build build
-.uild\msgpipe.exe
+.\build\msgpipe.exe
 ```
 
 ---
@@ -130,16 +130,6 @@ struct Message {
 ```
 
 Messages are sent via UDP in this binary format. When `MessageData == 10`, they are routed over TCP.
-
----
-
-## Known Issues
-
-| Issue | Solution |
-|-------|----------|
-| Windows lacks `<netinet/in.h>` | Code uses `#ifdef` with Windows API fallbacks |
-| Testing requires localhost TCP server | Can use `nc -l 9000` or run Python test server |
-| No STL containers allowed | Custom allocators, fixed-size buffers used |
 
 ---
 
