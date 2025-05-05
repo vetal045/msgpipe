@@ -9,8 +9,6 @@ namespace msgpipe::storage {
 /**
  * @class MessageBucket
  * @brief Thread-safe fixed-size bucket for storing unique Message IDs.
- *
- * Designed for fast, low-contention insert/exist checks.
  */
 class MessageBucket {
 public:

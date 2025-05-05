@@ -17,7 +17,8 @@
 #include <iostream>
 
 namespace {
-int connectWithRetry(const std::string& host, int port, int max_ms = 3000) {
+
+int connectWithRetry(const std::string& host, int port, int max_ms = 10000) {
 #if defined(_WIN32)
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock == INVALID_SOCKET) throw std::runtime_error("Failed to create TCP socket");
@@ -76,49 +77,23 @@ int connectWithRetry(const std::string& host, int port, int max_ms = 3000) {
 
 } // namespace
 
-TcpOutputWorker::TcpOutputWorker(
-    const std::string& host,
-    int port,
-    msgpipe::storage::MessageQueue& queue)
+TcpOutputWorker::TcpOutputWorker(const std::string& host, int port, msgpipe::storage::MessageQueue& queue)
     : host_(host), port_(port), queue_(queue)
 {
 #if defined(_WIN32)
     WSADATA wsaData;
-    int startupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-    if (startupResult != 0) {
-        std::cerr << "WSAStartup failed: " << startupResult << std::endl;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        std::cerr << "WSAStartup failed\n";
         std::exit(1);
     }
 #endif
 
-    sock_ = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_ < 0) {
-        perror("socket");
+    try {
+        sock_ = connectWithRetry(host_, port_, 10000);
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << "\n";
         std::exit(1);
     }
-
-    sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(static_cast<uint16_t>(port));
-
-#if defined(_WIN32)
-    if (InetPton(AF_INET, host.c_str(), &serverAddr.sin_addr) != 1) {
-        std::cerr << "InetPton failed\n";
-        std::exit(1);
-    }
-#else
-    if (inet_pton(AF_INET, host.c_str(), &serverAddr.sin_addr) <= 0) {
-        perror("inet_pton");
-        std::exit(1);
-    }
-#endif
-
-    if (connect(sock_, reinterpret_cast<sockaddr*>(&serverAddr), sizeof(serverAddr)) < 0) {
-        perror("connect");
-        std::exit(1);
-    }
-
-    std::cout << "[TCP] Connected to " << host_ << ":" << port_ << "\n";
 }
 
 TcpOutputWorker::~TcpOutputWorker() {
@@ -131,15 +106,6 @@ TcpOutputWorker::~TcpOutputWorker() {
 }
 
 void TcpOutputWorker::run(std::atomic<bool>& stop) {
-    if (sock_ < 0) {
-        try {
-            sock_ = connectWithRetry(host_, port_, 3000);
-        } catch (const std::exception& e) {
-            std::cerr << e.what() << "\n";
-            return;
-        }
-    }
-
     msgpipe::protocol::Message msg;
 
     while (!stop.load()) {
@@ -157,14 +123,7 @@ void TcpOutputWorker::run(std::atomic<bool>& stop) {
         if (sent != sizeof(msg)) {
             perror("[TCP] send");
         } else {
-            std::cout << "[QUEUE] tryPop ID: " << msg.id << "\n";
+            std::cout << "[TCP] Sent message ID: " << msg.id << "\n";
         }
     }
-
-#if defined(_WIN32)
-    closesocket(sock_);
-#else
-    close(sock_);
-#endif
 }
-
