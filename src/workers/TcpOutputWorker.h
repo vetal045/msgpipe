@@ -5,6 +5,7 @@
 
 #include <string>
 
+namespace msgpipe::workers {
 /**
  * @class TcpOutputWorker
  * @brief Reads messages from the queue and sends them to a TCP destination.
@@ -37,3 +38,4 @@ private:
     int port_;
     msgpipe::storage::MessageQueue& queue_;
 };
+} // namespace msgpipe::workers

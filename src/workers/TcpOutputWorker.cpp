@@ -77,6 +77,7 @@ int connectWithRetry(const std::string& host, int port, int max_ms = 10000) {
 
 } // namespace
 
+namespace msgpipe::workers {
 TcpOutputWorker::TcpOutputWorker(const std::string& host, int port, msgpipe::storage::MessageQueue& queue)
     : host_(host), port_(port), queue_(queue)
 {
@@ -127,3 +128,4 @@ void TcpOutputWorker::run(std::atomic<bool>& stop) {
         }
     }
 }
+} // namespace msgpipe::workers

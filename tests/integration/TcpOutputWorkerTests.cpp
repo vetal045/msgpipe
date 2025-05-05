@@ -77,7 +77,7 @@ TEST(TcpOutputWorkerTest, SendsMessageToServer) {
     queue.tryPush(msg);
 
     std::thread clientThread([&]() {
-        TcpOutputWorker client("127.0.0.1", kPort, queue);
+        msgpipe::workers::TcpOutputWorker client("127.0.0.1", kPort, queue);
         client.run(stop);
     });
 

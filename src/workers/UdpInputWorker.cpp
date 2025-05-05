@@ -25,6 +25,7 @@ int makeSocketNonBlocking(int sock) {
 #endif
 } // namespace
 
+namespace msgpipe::workers {
 UdpInputWorker::UdpInputWorker(
     int port,
     msgpipe::storage::MessageBucketStore& store,
@@ -167,3 +168,4 @@ void UdpInputWorker::run(std::atomic<bool>& stop) {
     }
 #endif
 }
+} // namespace msgpipe::workers

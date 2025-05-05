@@ -25,6 +25,8 @@
     using socket_t = int;
 #endif
 
+namespace msgpipe::workers {
+
 /**
  * @class UdpInputWorker
  * @brief Receives UDP packets, parses messages and pushes relevant ones to queue.
@@ -61,3 +63,4 @@ private:
     msgpipe::storage::MessageBucketStore& store_; ///< Deduplication store
     msgpipe::storage::MessageQueue& queue_; ///< Queue for forwarding parsed messages
 };
+} // namespace msgpipe::workers

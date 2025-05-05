@@ -34,7 +34,7 @@ TEST(UdpInputWorkerTest, ReceivesMessageAndPushesToQueue) {
 #endif
 
     std::thread workerThread([&]() {
-        UdpInputWorker worker(kPort, store, queue);
+        msgpipe::workers::UdpInputWorker worker(kPort, store, queue);
         worker.run(stop);
     });
 
