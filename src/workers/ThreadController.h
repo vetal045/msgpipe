@@ -1,3 +1,7 @@
+/**
+ * @file ThreadController.h
+ * @brief Manages all worker threads (UDP receivers, TCP sender).
+ */
 #pragma once
 
 #include "workers/UdpInputWorker.h"
@@ -8,13 +12,7 @@
 
 #include <memory>
 #include <string>
-
-#if defined(__APPLE__)
-    #include <thread>
-#else
-    #include <thread>
-    #include <stop_token>
-#endif
+#include <thread>
 
 namespace msgpipe::workers {
 

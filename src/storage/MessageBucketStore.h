@@ -1,3 +1,7 @@
+/**
+ * @file MessageBucketStore.h
+ * @brief Contains the MessageBucketStore class for deduplication.
+ */
 #pragma once
 
 #include "protocol/Message.h"
@@ -19,7 +23,18 @@ public:
     explicit MessageBucketStore(std::size_t bucketCount);
     ~MessageBucketStore();
 
+    /**
+     * @brief Inserts message if its ID has not been seen before.
+     * @param msg Parsed message
+     * @return True if inserted (not duplicate), false otherwise
+     */
     bool insertIfAbsent(const msgpipe::protocol::Message& msg);
+
+    /**
+     * @brief Checks whether a message ID has already been seen.
+     * @param messageId ID to check
+     * @return True if message exists, false otherwise
+     */
     bool exists(uint64_t messageId) const;
 
 private:
