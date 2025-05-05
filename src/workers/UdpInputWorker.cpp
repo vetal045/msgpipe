@@ -1,24 +1,28 @@
 #include "workers/UdpInputWorker.h"
-#include <cstring>
+
 #include <iostream>
-#include <fcntl.h>
-#include <unistd.h>
+#include <cstring>
+#include <thread>
 
 #if defined(__linux__)
+    #include <fcntl.h>
     #include <sys/epoll.h>
-#elif defined(__APPLE__) || defined(_WIN32)
+#elif defined(__APPLE__)
     #include <poll.h>
+    #include <fcntl.h>
+#elif defined(_WIN32)
+    #include <ws2tcpip.h>
 #endif
 
 namespace {
-
 constexpr std::size_t kMaxPacketSize = sizeof(msgpipe::protocol::Message);
 
+#if !defined(_WIN32)
 int makeSocketNonBlocking(int sock) {
     int flags = fcntl(sock, F_GETFL, 0);
     return fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 }
-
+#endif
 } // namespace
 
 UdpInputWorker::UdpInputWorker(
@@ -27,6 +31,29 @@ UdpInputWorker::UdpInputWorker(
     msgpipe::storage::MessageQueue& queue)
     : store_(store), queue_(queue)
 {
+#if defined(_WIN32)
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
+        std::cerr << "WSAStartup failed\n";
+        std::exit(1);
+    }
+
+    sock_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sock_ == INVALID_SOCKET) {
+        std::cerr << "UDP socket creation failed\n";
+        std::exit(1);
+    }
+
+    sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+
+    if (bind(sock_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+        std::cerr << "UDP bind failed\n";
+        std::exit(1);
+    }
+#else
     sock_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock_ < 0) {
         perror("socket");
@@ -47,10 +74,16 @@ UdpInputWorker::UdpInputWorker(
         perror("fcntl");
         std::exit(1);
     }
+#endif
 }
 
 UdpInputWorker::~UdpInputWorker() {
+#if defined(_WIN32)
+    closesocket(sock_);
+    WSACleanup();
+#else
     close(sock_);
+#endif
 }
 
 void UdpInputWorker::run(std::atomic<bool>& stop) {
@@ -80,15 +113,14 @@ void UdpInputWorker::run(std::atomic<bool>& stop) {
         if (!parsed.has_value()) continue;
 
         const auto& msg = parsed.value();
-        if (store_.insertIfAbsent(msg)) {
-            if (msg.data == 10) {
-                queue_.tryPush(msg);
-            }
+        if (store_.insertIfAbsent(msg) && msg.data == 10) {
+            queue_.tryPush(msg);
         }
     }
 
     close(epollFd);
-#else
+
+#elif defined(__APPLE__)
     pollfd pfd{};
     pfd.fd = sock_;
     pfd.events = POLLIN;
@@ -104,10 +136,33 @@ void UdpInputWorker::run(std::atomic<bool>& stop) {
         if (!parsed.has_value()) continue;
 
         const auto& msg = parsed.value();
-        if (store_.insertIfAbsent(msg)) {
-            if (msg.data == 10) {
-                queue_.tryPush(msg);
-            }
+        if (store_.insertIfAbsent(msg) && msg.data == 10) {
+            queue_.tryPush(msg);
+        }
+    }
+
+#elif defined(_WIN32)
+    while (!stop.load()) {
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(sock_, &readfds);
+
+        timeval timeout;
+        timeout.tv_sec = 0;
+        timeout.tv_usec = 100000;
+
+        int rc = select(0, &readfds, nullptr, nullptr, &timeout);
+        if (rc <= 0) continue;
+
+        int received = recvfrom(sock_, reinterpret_cast<char*>(buffer), static_cast<int>(kMaxPacketSize), 0, nullptr, nullptr);
+        if (received <= 0) continue;
+
+        auto parsed = parser_.parse(buffer, static_cast<std::size_t>(received));
+        if (!parsed.has_value()) continue;
+
+        const auto& msg = parsed.value();
+        if (store_.insertIfAbsent(msg) && msg.data == 10) {
+            queue_.tryPush(msg);
         }
     }
 #endif

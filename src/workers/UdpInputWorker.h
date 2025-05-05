@@ -6,36 +6,35 @@
 #include "storage/MessageQueue.h"
 
 #include <cstddef>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
+#include <atomic>
 
-/**
- * @class UdpInputWorker
- * @brief Thread-executed component that receives and processes messages over UDP.
- */
+#if defined(_WIN32)
+    #define NOMINMAX
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+    using socket_t = SOCKET;
+#else
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <unistd.h>
+    using socket_t = int;
+#endif
+
 class UdpInputWorker {
 public:
-    /**
-     * @brief Constructs the worker with references to storage and queue.
-     * @param port UDP port to bind to
-     * @param store Message deduplication store
-     * @param queue Queue for forwarding messages with data == 10
-     */
     UdpInputWorker(int port,
                    msgpipe::storage::MessageBucketStore& store,
                    msgpipe::storage::MessageQueue& queue);
-
     ~UdpInputWorker();
 
-    /**
-     * @brief Starts the blocking receive loop. Intended to be run in a thread.
-     */
     void run(std::atomic<bool>& stop);
 
 private:
-    int sock_;
+    socket_t sock_;
+#if !defined(_WIN32)
     sockaddr_in addr_;
+#endif
     msgpipe::parsers::MessageParser parser_;
     msgpipe::storage::MessageBucketStore& store_;
     msgpipe::storage::MessageQueue& queue_;

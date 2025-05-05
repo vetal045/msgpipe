@@ -7,10 +7,18 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <unistd.h>
 #include <cstring>
+
+#if defined(_WIN32)
+    #define NOMINMAX
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #pragma comment(lib, "ws2_32.lib")
+#else
+    #include <netinet/in.h>
+    #include <sys/socket.h>
+    #include <unistd.h>
+#endif
 
 using namespace msgpipe;
 
@@ -20,6 +28,11 @@ TEST(UdpInputWorkerTest, ReceivesMessageAndPushesToQueue) {
     storage::MessageQueue queue(8);
     std::atomic<bool> stop{false};
 
+#if defined(_WIN32)
+    WSADATA wsaData;
+    WSAStartup(MAKEWORD(2, 2), &wsaData);
+#endif
+
     std::thread workerThread([&]() {
         UdpInputWorker worker(kPort, store, queue);
         worker.run(stop);
@@ -28,19 +41,34 @@ TEST(UdpInputWorkerTest, ReceivesMessageAndPushesToQueue) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100)); // let worker bind
 
     // Send UDP message
+#if defined(_WIN32)
+    SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+#else
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
+#endif
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(kPort);
     addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
     protocol::Message msg{sizeof(protocol::Message), 1, 12345, 10};
-    sendto(sock, &msg, sizeof(msg), 0, (sockaddr*)&addr, sizeof(addr));
+#if defined(_WIN32)
+    sendto(sock, reinterpret_cast<const char*>(&msg), sizeof(msg), 0,
+           reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+    closesocket(sock);
+#else
+    sendto(sock, &msg, sizeof(msg), 0,
+           reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
     close(sock);
+#endif
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     stop = true;
     workerThread.join();
+
+#if defined(_WIN32)
+    WSACleanup();
+#endif
 
     protocol::Message out{};
     EXPECT_TRUE(queue.tryPop(out));
