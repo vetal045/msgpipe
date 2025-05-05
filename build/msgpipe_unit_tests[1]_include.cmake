@@ -1,0 +1,5 @@
+if(EXISTS "/Users/vitaliiryzhov/Desktop/msgpipe/build/msgpipe_unit_tests[1]_tests.cmake")
+  include("/Users/vitaliiryzhov/Desktop/msgpipe/build/msgpipe_unit_tests[1]_tests.cmake")
+else()
+  add_test(msgpipe_unit_tests_NOT_BUILT msgpipe_unit_tests_NOT_BUILT)
+endif()
