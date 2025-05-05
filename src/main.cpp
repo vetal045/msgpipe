@@ -17,7 +17,7 @@ int main() {
     constexpr const char* kTcpHost = "127.0.0.1";
     constexpr int kTcpPort = 9000;
     constexpr std::size_t kBucketCount = 1024;
-    constexpr std::size_t kQueueCapacity = 512;
+    constexpr std::size_t kQueueCapacity = 65536;
 
     // Init core components
     msgpipe::storage::MessageBucketStore store(kBucketCount);
