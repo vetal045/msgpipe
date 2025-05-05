@@ -16,6 +16,7 @@
 #include <thread>
 #include <iostream>
 
+namespace {
 int connectWithRetry(const std::string& host, int port, int max_ms = 3000) {
 #if defined(_WIN32)
     SOCKET sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -130,11 +131,13 @@ TcpOutputWorker::~TcpOutputWorker() {
 }
 
 void TcpOutputWorker::run(std::atomic<bool>& stop) {
-    try {
-        sock_ = connectWithRetry(serverIp_, serverPort_, 3000);
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << "\n";
-        return;
+    if (sock_ < 0) {
+        try {
+            sock_ = connectWithRetry(host_, port_, 3000);
+        } catch (const std::exception& e) {
+            std::cerr << e.what() << "\n";
+            return;
+        }
     }
 
     msgpipe::protocol::Message msg;
@@ -153,6 +156,8 @@ void TcpOutputWorker::run(std::atomic<bool>& stop) {
 
         if (sent != sizeof(msg)) {
             perror("[TCP] send");
+        } else {
+            std::cout << "[QUEUE] tryPop ID: " << msg.id << "\n";
         }
     }
 
@@ -162,3 +167,4 @@ void TcpOutputWorker::run(std::atomic<bool>& stop) {
     close(sock_);
 #endif
 }
+

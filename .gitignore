@@ -1,1 +1,20 @@
-build/
+# macOS
+.DS_Store
+
+# CMake
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# IDE
+.vscode/
+
+# Test artifacts
+msgpipe_unit_tests
+msgpipe_integration_tests
+
+# Python cache
+__pycache__/
+*.pyc

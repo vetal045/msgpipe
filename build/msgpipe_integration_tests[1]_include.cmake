@@ -1,5 +1,0 @@
-if(EXISTS "/Users/vitaliiryzhov/Desktop/msgpipe/build/msgpipe_integration_tests[1]_tests.cmake")
-  include("/Users/vitaliiryzhov/Desktop/msgpipe/build/msgpipe_integration_tests[1]_tests.cmake")
-else()
-  add_test(msgpipe_integration_tests_NOT_BUILT msgpipe_integration_tests_NOT_BUILT)
-endif()
