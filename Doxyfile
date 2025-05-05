@@ -1,7 +1,7 @@
 PROJECT_NAME           = "msgpipe"
-INPUT                  = .
+INPUT                  = src
 FILE_PATTERNS          = *.h
-RECURSIVE              = NO
+RECURSIVE              = YES
 GENERATE_LATEX         = NO
 OUTPUT_DIRECTORY       = ./docs
 GENERATE_HTML          = YES
