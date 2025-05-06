@@ -21,6 +21,8 @@ ThreadController::~ThreadController() {
 }
 
 void ThreadController::start() {
+    tcp_->connect();
+    
 #if defined(__APPLE__)
     threads_[0] = std::thread([this]() { udp1_->run(stop_); });
     threads_[1] = std::thread([this]() { udp2_->run(stop_); });

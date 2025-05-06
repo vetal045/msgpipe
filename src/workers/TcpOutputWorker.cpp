@@ -40,27 +40,12 @@ int connectWithRetry(const std::string& host, int port, int max_ms = 10000) {
     }
 
     auto start = std::chrono::steady_clock::now();
-    bool firstFailLogged = false;
 
     while (true) {
         int result = connect(sock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
         if (result == 0) {
-            std::cout << "[TCP] Connected to " << host << ":" << port << "\n";
             return sock;
         }
-
-#if defined(_WIN32)
-        int err = WSAGetLastError();
-        if (!firstFailLogged) {
-            std::cerr << "[TCP] Connect failed: " << err << "\n";
-            firstFailLogged = true;
-        }
-#else
-        if (!firstFailLogged) {
-            std::cerr << "[TCP] Connect failed: " << strerror(errno) << "\n";
-            firstFailLogged = true;
-        }
-#endif
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         auto now = std::chrono::steady_clock::now();
@@ -70,11 +55,10 @@ int connectWithRetry(const std::string& host, int port, int max_ms = 10000) {
 #else
             close(sock);
 #endif
-            throw std::runtime_error("[TCP] Connection timeout to " + host + ":" + std::to_string(port));
+            throw std::runtime_error("Connection timeout to " + host + ":" + std::to_string(port));
         }
     }
 }
-
 } // namespace
 
 namespace msgpipe::workers {
@@ -85,15 +69,14 @@ TcpOutputWorker::TcpOutputWorker(const std::string& host, int port, msgpipe::sto
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         std::cerr << "WSAStartup failed\n";
-        std::exit(1);
     }
 #endif
+}
 
-    try {
-        sock_ = connectWithRetry(host_, port_, 10000);
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << "\n";
-        std::exit(1);
+void TcpOutputWorker::connect() {
+    sock_ = connectWithRetry(host_, port_, 10000);
+    if (sock_ < 0) {
+        throw std::runtime_error("TCP connection failed");
     }
 }
 
@@ -122,9 +105,7 @@ void TcpOutputWorker::run(std::atomic<bool>& stop) {
 #endif
 
         if (sent != sizeof(msg)) {
-            perror("[TCP] send");
-        } else {
-            std::cout << "[TCP] Sent message ID: " << msg.id << "\n";
+            throw std::runtime_error("[TCP] send failed");
         }
     }
 }

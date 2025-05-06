@@ -35,14 +35,12 @@ UdpInputWorker::UdpInputWorker(
 #if defined(_WIN32)
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2,2), &wsaData) != 0) {
-        std::cerr << "WSAStartup failed\n";
-        std::exit(1);
+        throw std::runtime_error("WSAStartup failed");
     }
 
     sock_ = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_ == INVALID_SOCKET) {
-        std::cerr << "UDP socket creation failed\n";
-        std::exit(1);
+        throw std::runtime_error("UDP socket creation failed");
     }
 
     sockaddr_in addr{};
@@ -51,14 +49,12 @@ UdpInputWorker::UdpInputWorker(
     addr.sin_port = htons(port);
 
     if (bind(sock_, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
-        std::cerr << "UDP bind failed\n";
-        std::exit(1);
+        throw std::runtime_error("UDP bind failed");
     }
 #else
     sock_ = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock_ < 0) {
-        perror("socket");
-        std::exit(1);
+        throw std::runtime_error("socket() failed");
     }
 
     std::memset(&addr_, 0, sizeof(addr_));
@@ -67,14 +63,10 @@ UdpInputWorker::UdpInputWorker(
     addr_.sin_port = htons(port);
 
     if (bind(sock_, reinterpret_cast<sockaddr*>(&addr_), sizeof(addr_)) < 0) {
-        perror("bind");
-        std::exit(1);
+        throw std::runtime_error("UDP bind failed: " + std::string(strerror(errno)));
     }
 
-    if (makeSocketNonBlocking(sock_) < 0) {
-        perror("fcntl");
-        std::exit(1);
-    }
+    makeSocketNonBlocking(sock_);
 #endif
 }
 

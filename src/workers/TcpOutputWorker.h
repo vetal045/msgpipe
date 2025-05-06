@@ -32,6 +32,9 @@ public:
      */
     void run(std::atomic<bool>& stop);
 
+    /// @brief Must be called once before run().
+    void connect();
+
 private:
     int sock_;
     std::string host_;
