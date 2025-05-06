@@ -26,21 +26,27 @@ TEST(UdpInputWorkerTest, ReceivesMessageAndPushesToQueue) {
     constexpr int kPort = 9050;
     storage::MessageBucketStore store(64);
     storage::MessageQueue queue(8);
-    std::atomic<bool> stop{false};
 
 #if defined(_WIN32)
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 #endif
 
+#if defined(__APPLE__)
+    std::atomic<bool> stop{false};
     std::thread workerThread([&]() {
         msgpipe::workers::UdpInputWorker worker(kPort, store, queue);
         worker.run(stop);
     });
+#else
+    std::jthread workerThread([&](std::stop_token st) {
+        msgpipe::workers::UdpInputWorker worker(kPort, store, queue);
+        worker.run(st);
+    });
+#endif
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // let worker bind
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    // Send UDP message
 #if defined(_WIN32)
     SOCKET sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 #else
@@ -63,8 +69,14 @@ TEST(UdpInputWorkerTest, ReceivesMessageAndPushesToQueue) {
 #endif
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+#if defined(__APPLE__)
     stop = true;
     workerThread.join();
+#else
+    workerThread.request_stop();
+    workerThread.join();
+#endif
 
 #if defined(_WIN32)
     WSACleanup();

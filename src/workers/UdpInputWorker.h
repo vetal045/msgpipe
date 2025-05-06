@@ -11,6 +11,7 @@
 
 #include <cstddef>
 #include <atomic>
+#include <stop_token>
 
 #if defined(_WIN32)
     #define NOMINMAX

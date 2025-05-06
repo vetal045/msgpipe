@@ -5,6 +5,7 @@
 #include "workers/SocketFd.h"
 
 #include <string>
+#include <stop_token>
 
 namespace msgpipe::workers {
 /**

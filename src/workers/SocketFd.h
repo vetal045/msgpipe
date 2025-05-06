@@ -22,15 +22,16 @@ public:
     {
     }
 
-    ~SocketFd() {
+    ~SocketFd() noexcept {
         if (fd_ >= 0) {
-#if defined(_WIN32)
+    #if defined(_WIN32)
             ::closesocket(fd_);
-#else
+    #else
             ::close(fd_);
-#endif
+    #endif
         }
     }
+    
 
     SocketFd(SocketFd&& other) noexcept
         : fd_(std::exchange(other.fd_, -1)) {}

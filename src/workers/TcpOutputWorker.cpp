@@ -92,9 +92,9 @@ void TcpOutputWorker::run(std::stop_token stopToken)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
-
         ssize_t sent = ::send(sock_.get(), &msg, sizeof(msg), 0);
         if (sent != sizeof(msg)) {
+            std::cerr << "[TCP] send failed\n";
             throw std::runtime_error("[TCP] send failed");
         }
     }

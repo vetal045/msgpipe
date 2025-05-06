@@ -5,7 +5,9 @@
 #include <gtest/gtest.h>
 #include <thread>
 #include <atomic>
+#include <future>
 #include <cstring>
+#include <iostream>
 
 #if defined(_WIN32)
     #define NOMINMAX
@@ -23,15 +25,17 @@ using namespace msgpipe;
 TEST(TcpOutputWorkerTest, SendsMessageToServer) {
     constexpr int kPort = 9060;
     storage::MessageQueue queue(4);
-    std::atomic<bool> stop{false};
     std::atomic<bool> received{false};
+
+    std::promise<void> serverReady;
+    std::shared_future<void> serverReadyFuture = serverReady.get_future().share();
 
 #if defined(_WIN32)
     WSADATA wsaData;
     WSAStartup(MAKEWORD(2,2), &wsaData);
 #endif
 
-    // Start mock TCP server
+    // TCP mock server
     std::thread serverThread([&]() {
 #if defined(_WIN32)
         SOCKET serverSock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -43,14 +47,28 @@ TEST(TcpOutputWorkerTest, SendsMessageToServer) {
         addr.sin_port = htons(kPort);
         addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
-        bind(serverSock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-        listen(serverSock, 1);
+        if (bind(serverSock, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
+            std::cerr << "[Server] bind() failed\n";
+            return;
+        }
+
+        if (listen(serverSock, 1) < 0) {
+            std::cerr << "[Server] listen() failed\n";
+            return;
+        }
+
+        serverReady.set_value(); // signal that server is ready
 
 #if defined(_WIN32)
         SOCKET clientSock = accept(serverSock, nullptr, nullptr);
 #else
         int clientSock = accept(serverSock, nullptr, nullptr);
 #endif
+
+        if (clientSock < 0) {
+            std::cerr << "[Server] accept() failed\n";
+            return;
+        }
 
         protocol::Message msg{};
 #if defined(_WIN32)
@@ -72,20 +90,49 @@ TEST(TcpOutputWorkerTest, SendsMessageToServer) {
 #endif
     });
 
-    // Fill queue
+    // prepare message
     protocol::Message msg{sizeof(protocol::Message), 1, 9999, 10};
     queue.tryPush(msg);
 
+#if defined(__APPLE__)
+    std::atomic<bool> stop{false};
     std::thread clientThread([&]() {
-        msgpipe::workers::TcpOutputWorker client("127.0.0.1", kPort, queue);
-        client.connect();
-        client.run(stop);
+        try {
+            serverReadyFuture.wait(); // wait for server to be ready
+
+            auto client = std::make_unique<msgpipe::workers::TcpOutputWorker>("127.0.0.1", kPort, queue);
+            client->connect();
+            client->run(stop);
+        } catch (const std::exception& ex) {
+            std::cerr << "[ClientThread] Exception: " << ex.what() << "\n";
+        } catch (...) {
+            std::cerr << "[ClientThread] Unknown exception\n";
+        }
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(300));
     stop = true;
-
     clientThread.join();
+#else
+    std::jthread clientThread([&](std::stop_token st) {
+        try {
+            serverReadyFuture.wait(); // wait for server to be ready
+
+            auto client = std::make_unique<msgpipe::workers::TcpOutputWorker>("127.0.0.1", kPort, queue);
+            client->connect();
+            client->run(st);
+        } catch (const std::exception& ex) {
+            std::cerr << "[ClientThread] Exception: " << ex.what() << "\n";
+        } catch (...) {
+            std::cerr << "[ClientThread] Unknown exception\n";
+        }
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    clientThread.request_stop();
+    clientThread.join();
+#endif
+
     serverThread.join();
 
 #if defined(_WIN32)
