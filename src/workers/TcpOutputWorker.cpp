@@ -5,6 +5,7 @@
     #include <winsock2.h>
     #include <ws2tcpip.h>
     #pragma comment(lib, "ws2_32.lib")
+    using ssize_t = int;
 #else
     #include <sys/socket.h>
     #include <netinet/in.h>
@@ -92,7 +93,8 @@ void TcpOutputWorker::run(std::stop_token stopToken)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
-        ssize_t sent = ::send(sock_.get(), &msg, sizeof(msg), 0);
+        ssize_t sent = send(sock_.get(), reinterpret_cast<const char*>(&msg), sizeof(msg), 0);
+
         if (sent != sizeof(msg)) {
             std::cerr << "[TCP] send failed\n";
             throw std::runtime_error("[TCP] send failed");

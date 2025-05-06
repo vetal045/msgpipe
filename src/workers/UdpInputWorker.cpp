@@ -87,6 +87,15 @@ void UdpInputWorker::run(std::stop_token stopToken)
 {
     std::byte buffer[kMaxPacketSize];
 
+    // Универсальный флаг остановки
+    auto stopRequested = [&]() -> bool {
+    #if defined(__APPLE__)
+        return stop.load();
+    #else
+        return stopToken.stop_requested();
+    #endif
+    };
+
 #if defined(__linux__)
     int epollFd = epoll_create1(0);
     if (epollFd < 0) {
@@ -100,12 +109,7 @@ void UdpInputWorker::run(std::stop_token stopToken)
     epoll_ctl(epollFd, EPOLL_CTL_ADD, sock_, &ev);
     epoll_event events[1];
 
-#if defined(__APPLE__)
-    while (!stop.load())
-#else
-    while (!stopToken.stop_requested())
-#endif
-    {
+    while (!stopRequested()) {
         int nfds = epoll_wait(epollFd, events, 1, 100);
         if (nfds <= 0) continue;
 
@@ -128,7 +132,7 @@ void UdpInputWorker::run(std::stop_token stopToken)
     pfd.fd = sock_;
     pfd.events = POLLIN;
 
-    while (!stop.load()) {
+    while (!stopRequested()) {
         int rc = poll(&pfd, 1, 100);
         if (rc <= 0) continue;
 
@@ -145,7 +149,7 @@ void UdpInputWorker::run(std::stop_token stopToken)
     }
 
 #elif defined(_WIN32)
-    while (!stop.load()) {
+    while (!stopRequested()) {
         fd_set readfds;
         FD_ZERO(&readfds);
         FD_SET(sock_, &readfds);
@@ -170,5 +174,6 @@ void UdpInputWorker::run(std::stop_token stopToken)
     }
 #endif
 }
+
 
 } // namespace msgpipe::workers
