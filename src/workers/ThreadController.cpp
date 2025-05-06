@@ -22,25 +22,27 @@ ThreadController::~ThreadController() {
 
 void ThreadController::start() {
     tcp_->connect();
-    
+
 #if defined(__APPLE__)
     threads_[0] = std::thread([this]() { udp1_->run(stop_); });
     threads_[1] = std::thread([this]() { udp2_->run(stop_); });
     threads_[2] = std::thread([this]() { tcp_->run(stop_); });
 #else
-    threads_[0] = std::jthread([this](std::stop_token) { udp1_->run(stop_); });
-    threads_[1] = std::jthread([this](std::stop_token) { udp2_->run(stop_); });
-    threads_[2] = std::jthread([this](std::stop_token) { tcp_->run(stop_); });
+    threads_[0] = std::jthread([this](std::stop_token st) { udp1_->run(st); });
+    threads_[1] = std::jthread([this](std::stop_token st) { udp2_->run(st); });
+    threads_[2] = std::jthread([this](std::stop_token st) { tcp_->run(st); });
 #endif
+
     threadCount_ = 3;
     std::cout << "[msgpipe] All workers started. Press Ctrl+C to exit.\n";
 }
 
 void ThreadController::stop() {
 #if defined(__APPLE__)
+    stop_ = true;
     for (int i = 0; i < threadCount_; ++i) {
         if (threads_[i].joinable()) {
-            threads_[i].detach(); // or join()
+            threads_[i].detach();
         }
     }
 #else
@@ -49,5 +51,6 @@ void ThreadController::stop() {
     }
 #endif
 }
+
 
 } // namespace msgpipe::workers

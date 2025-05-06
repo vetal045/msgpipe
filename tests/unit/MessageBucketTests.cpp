@@ -3,14 +3,18 @@
 
 using namespace msgpipe::storage;
 
-TEST(MessageBucketTest, InsertUniqueIds) {
+TEST(MessageBucketTest, RejectsDuplicateAndOverflow) {
     MessageBucket bucket;
-    EXPECT_TRUE(bucket.insertIfAbsent(1));
-    EXPECT_TRUE(bucket.insertIfAbsent(2));
-    EXPECT_TRUE(bucket.insertIfAbsent(3));
-    EXPECT_TRUE(bucket.insertIfAbsent(4));
-    EXPECT_FALSE(bucket.insertIfAbsent(5)); // full
+
+    // Insert 256 unique IDs
+    for (uint64_t i = 1; i <= 256; ++i) {
+        EXPECT_TRUE(bucket.insertIfAbsent(i));
+    }
+
+    EXPECT_FALSE(bucket.insertIfAbsent(1));
+    EXPECT_FALSE(bucket.insertIfAbsent(999));
 }
+
 
 TEST(MessageBucketTest, InsertDuplicateId) {
     MessageBucket bucket;

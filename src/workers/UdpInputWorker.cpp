@@ -79,7 +79,12 @@ UdpInputWorker::~UdpInputWorker() {
 #endif
 }
 
-void UdpInputWorker::run(std::atomic<bool>& stop) {
+#if defined(__APPLE__)
+void UdpInputWorker::run(std::atomic<bool>& stop)
+#else
+void UdpInputWorker::run(std::stop_token stopToken)
+#endif
+{
     std::byte buffer[kMaxPacketSize];
 
 #if defined(__linux__)
@@ -95,7 +100,12 @@ void UdpInputWorker::run(std::atomic<bool>& stop) {
     epoll_ctl(epollFd, EPOLL_CTL_ADD, sock_, &ev);
     epoll_event events[1];
 
-    while (!stop.load()) {
+#if defined(__APPLE__)
+    while (!stop.load())
+#else
+    while (!stopToken.stop_requested())
+#endif
+    {
         int nfds = epoll_wait(epollFd, events, 1, 100);
         if (nfds <= 0) continue;
 
@@ -160,4 +170,5 @@ void UdpInputWorker::run(std::atomic<bool>& stop) {
     }
 #endif
 }
+
 } // namespace msgpipe::workers

@@ -1,40 +1,39 @@
 #pragma once
 
-#include <cstdint>
-#include <atomic>
 #include <mutex>
+#include <cstdint>
 
 namespace msgpipe::storage {
 
 /**
  * @class MessageBucket
- * @brief Thread-safe fixed-size bucket for storing unique Message IDs.
+ * @brief Stores up to 256 unique message IDs for deduplication.
+ *
+ * Thread-safe via internal coarse-grained locking.
+ * Designed for high-performance insertion and lookup in fixed-size slot.
  */
 class MessageBucket {
 public:
-    static constexpr std::size_t kMaxEntries = 4;
-
     /**
-     * @brief Attempts to insert ID if it does not exist yet.
-     * @param messageId ID to insert
+     * @brief Insert a new ID if it doesn't already exist.
+     * @param id Message ID
      * @return true if inserted, false if duplicate or full
      */
-    bool insertIfAbsent(uint64_t messageId);
+    bool insertIfAbsent(uint64_t id);
 
     /**
-     * @brief Checks whether ID exists in the bucket.
-     * @param messageId ID to check
-     * @return true if found
+     * @brief Check whether an ID already exists.
+     * @param id Message ID
+     * @return true if present, false otherwise
      */
-    bool exists(uint64_t messageId) const;
+    bool exists(uint64_t id) const;
 
 private:
-    struct Entry {
-        std::atomic<uint64_t> id{0};
-    };
+    static constexpr std::size_t kCapacity = 256;
 
-    mutable std::mutex lock_;
-    Entry entries_[kMaxEntries];
+    mutable std::mutex mutex_;             ///< Guards access to ids_ and count_
+    uint64_t ids_[kCapacity]{};            ///< Stored message IDs
+    std::size_t count_{0};                 ///< Number of IDs currently stored
 };
 
 } // namespace msgpipe::storage

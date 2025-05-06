@@ -2,28 +2,28 @@
 
 namespace msgpipe::storage {
 
-bool MessageBucket::insertIfAbsent(uint64_t messageId) {
-    std::lock_guard<std::mutex> guard(lock_);
+bool MessageBucket::insertIfAbsent(uint64_t id) {
+    std::lock_guard<std::mutex> lock(mutex_);
 
-    for (auto& entry : entries_) {
-        uint64_t current = entry.id.load(std::memory_order_relaxed);
-        if (current == messageId) {
+    for (std::size_t i = 0; i < count_; ++i) {
+        if (ids_[i] == id) {
             return false;
-        }
-        if (current == 0) {
-            entry.id.store(messageId, std::memory_order_release);
-            return true;
         }
     }
 
-    return false;
+    if (count_ < kCapacity) {
+        ids_[count_++] = id;
+        return true;
+    }
+
+    return false; // full
 }
 
-bool MessageBucket::exists(uint64_t messageId) const {
-    std::lock_guard<std::mutex> guard(lock_);
+bool MessageBucket::exists(uint64_t id) const {
+    std::lock_guard<std::mutex> lock(mutex_);
 
-    for (const auto& entry : entries_) {
-        if (entry.id.load(std::memory_order_acquire) == messageId) {
+    for (std::size_t i = 0; i < count_; ++i) {
+        if (ids_[i] == id) {
             return true;
         }
     }

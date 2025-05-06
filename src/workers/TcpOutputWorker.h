@@ -2,6 +2,7 @@
 
 #include "storage/MessageQueue.h"
 #include "protocol/Message.h"
+#include "workers/SocketFd.h"
 
 #include <string>
 
@@ -30,13 +31,17 @@ public:
     /**
      * @brief Starts the blocking loop that sends messages from queue over TCP.
      */
+#if defined(__APPLE__)
     void run(std::atomic<bool>& stop);
+#else
+    void run(std::stop_token stopToken);
+#endif
 
     /// @brief Must be called once before run().
     void connect();
 
 private:
-    int sock_;
+    SocketFd sock_{-1};
     std::string host_;
     int port_;
     msgpipe::storage::MessageQueue& queue_;

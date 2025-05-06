@@ -52,7 +52,11 @@ public:
      * @brief Blocking execution loop. Receives and parses UDP packets until stop flag is set.
      * @param stop Atomic flag indicating external shutdown.
      */
+#if defined(__APPLE__)
     void run(std::atomic<bool>& stop);
+#else
+    void run(std::stop_token stopToken);
+#endif
 
 private:
     socket_t sock_;  ///< UDP socket handle (cross-platform)
